@@ -3,74 +3,8 @@
 namespace LogParser {
 
     const boost::regex pat(R"(^\[([A-Z]{3}) ([A-Za-z0-9\s_\-!@#$%^&*()_+|<?.:=\[\]/,]+?),(\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\.\d{3})\]:(.*)$)");
-    const std::vector<LogDetail> load_logs() {
-
-        long id = 0;
-        std::vector<LogDetail> db;
-        // 55..=65
-        // Original 558MB
-
-        for (int i = 55; i < 65; i++) {
-            char p[1024];
-            sprintf(p, "D:/Projects/log-parser/WV-ST-20240308/WV-ST-20240308-%04d.log", i);
-            std::string path = std::string(p);
-
-            load_file(&id, &path, &db);
-        }
-
-
-        return db;
-    }
-
-    const std::vector<LogDetail> load_files(const std::vector<std::string>& const paths) {
-        long id = 0;
-        std::vector<LogDetail> db;
-        for (std::string path : paths) {
-            load_file(&id, &path, &db);
-        }
-        return db;
-    }
-
-    const void load_file(long* id, const std::string const* path, std::vector<LogDetail>* db) {
-        std::ifstream file(*path);
-        if (!file.is_open()) {
-            std::cout << "Failed to open the file." << std::endl;
-            return;
-        }
-
-        std::string line;
-        while (std::getline(file, line)) {
-            boost::smatch matches;
-            if (boost::regex_match(line, matches, pat)) {
-                if (matches.size() == 5) {
-                    struct LogDetail d;
-                    d.id = *id;
-                    d.prority = matches[1];
-                    d.thread_name = matches[2];
-                    d.dt = matches[3];
-                    d.content = matches[4];
-                    db->push_back(d);
-                    *id = *id + 1;
-                }
-            }
-            else {
-                if (db->size() > 0) {
-                    LogDetail* lastItem = &db->at(db->size() - 1);
-                    lastItem->content = lastItem->content + "\n" + line;
-                }
-            }
-        }
-    }
-
 
     const LogStats load_logs_new() {
-        // 55..=65
-        // Raw file size = 110MB
-        // Original 558MB
-        // thread_name as pointer = 514MB
-        // shared_ptr = 513MB
-
-
         std::vector<std::string> paths;
         for (int i = 55; i < 57; i++) {
             char p[1024];
