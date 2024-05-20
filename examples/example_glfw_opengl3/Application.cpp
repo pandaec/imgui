@@ -99,7 +99,7 @@ public:
         ImGui::Begin("Log Viewer", &show_log_window);
 
         static char filter_str[1024] = "";
-        if (ImGui::InputTextWithHint("filter", "enter text here", filter_str, IM_ARRAYSIZE(filter_str), ImGuiInputTextFlags_EnterReturnsTrue)) {
+        if (ImGui::InputTextWithHint("Filter", "Enter text here", filter_str, IM_ARRAYSIZE(filter_str), ImGuiInputTextFlags_EnterReturnsTrue)) {
             db.logs.clear();
             for (const LogParser::LogDetailNew& info : original_db.logs) {
                 if (strstr(info.prority.c_str(), filter_str)
@@ -144,10 +144,10 @@ public:
 
         if (ImGui::BeginTable("LogTable", 5, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable))
         {
-            ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed);
-            ImGui::TableSetupColumn("AAA", ImGuiTableColumnFlags_WidthFixed);
-            ImGui::TableSetupColumn("BBB", ImGuiTableColumnFlags_WidthFixed);
-            ImGui::TableSetupColumn("CCC", ImGuiTableColumnFlags_WidthFixed);
+            ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_DefaultHide);
+            ImGui::TableSetupColumn("Time", ImGuiTableColumnFlags_WidthFixed);
+            ImGui::TableSetupColumn("Lv", ImGuiTableColumnFlags_WidthFixed);
+            ImGui::TableSetupColumn("Thread", ImGuiTableColumnFlags_WidthFixed);
             ImGui::TableSetupColumn("Content", ImGuiTableColumnFlags_WidthStretch);
             ImGui::TableHeadersRow();
 
@@ -161,22 +161,22 @@ public:
                     ImGui::TableNextRow();
                     const LogParser::LogDetailNew* d = &db.logs[i];
                     if (ImGui::TableSetColumnIndex(0)) {
+                        ImGui::Text("%ld", d->id);
+                    }
+                    if (ImGui::TableSetColumnIndex(1)) {
                         const bool item_is_selected = selection.contains(d->id);
-                        char str[32];
-                        sprintf(str, "%ld", d->id);
-                        if (ImGui::Selectable(str, item_is_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap, ImVec2(0, 0))) {
+                        char label[128];
+                        snprintf(label, sizeof(label), "%s##%ld", d->dt.c_str(), d->id);
+                        if (ImGui::Selectable(label, item_is_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap, ImVec2(0, 0))) {
                             selection.clear();
                             selection.push_back(d->id);
                         }
                     }
-                    if (ImGui::TableSetColumnIndex(1)) {
+                    if (ImGui::TableSetColumnIndex(2)) {
                         ImGui::Text("%s", d->prority.c_str());
                     }
-                    if (ImGui::TableSetColumnIndex(2)) {
-                        ImGui::Text("%s", d->thread_name->c_str());
-                    }
                     if (ImGui::TableSetColumnIndex(3)) {
-                        ImGui::Text("%s", d->dt.c_str());
+                        ImGui::Text("%s", d->thread_name->c_str());
                     }
                     if (ImGui::TableSetColumnIndex(4)) {
                         char str[512] = { 0 };
@@ -189,14 +189,6 @@ public:
                         ImGui::Text("%s", str);
                     }
 
-                    /*if (scroll_to_id == d->id) {
-                        if (!scrolled) {
-                            ImGui::SetScrollHereY();
-                            scrolled = true;
-                        }
-                        ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, IM_COL32(255, 255, 0, 128));
-                    }*/
-
                     if (scroll_to_id == d->id) {
                         ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, IM_COL32(255, 255, 0, 128));
                     }
@@ -208,9 +200,6 @@ public:
                 }
             }
             clipper.End();
-
-
-
             ImGui::EndTable();
         }
 
@@ -279,8 +268,11 @@ public:
 
                 ImGui::BeginChild("ChildFindTab", ImGui::GetContentRegionAvail(), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar);
 
-                if (ImGui::BeginTable("find_table", 2, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable)) {
-                    ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed);
+                if (ImGui::BeginTable("find_table", 5, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable)) {
+                    ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_DefaultHide);
+                    ImGui::TableSetupColumn("Time", ImGuiTableColumnFlags_WidthFixed);
+                    ImGui::TableSetupColumn("Lv", ImGuiTableColumnFlags_WidthFixed);
+                    ImGui::TableSetupColumn("Thread", ImGuiTableColumnFlags_WidthFixed);
                     ImGui::TableSetupColumn("Content", ImGuiTableColumnFlags_WidthStretch);
                     ImGui::TableHeadersRow();
 
@@ -291,15 +283,27 @@ public:
                             ImGui::TableNextRow();
                             const LogParser::LogDetailNew* d = &find_info.log_stats.logs[i];
                             if (ImGui::TableSetColumnIndex(0)) {
-                                char str[32];
-                                sprintf(str, "%ld", d->id);
-                                if (ImGui::Selectable(str, false, ImGuiSelectableFlags_SpanAllColumns, ImVec2(0, 0))) {
+                                ImGui::Text("%d", d->id);
+                            }
+
+                            if (ImGui::TableSetColumnIndex(1)) {
+                                char label[128];
+                                snprintf(label, sizeof(label), "%s##%ld", d->dt.c_str(), d->id);
+                                if (ImGui::Selectable(label, false, ImGuiSelectableFlags_SpanAllColumns, ImVec2(0, 0))) {
                                     scroll_to_id = d->id;
                                     scrolled = false;
                                 }
                             }
 
-                            if (ImGui::TableSetColumnIndex(1)) {
+                            if (ImGui::TableSetColumnIndex(2)) {
+                                ImGui::Text("%s", d->prority.c_str());
+                            }
+
+                            if (ImGui::TableSetColumnIndex(3)) {
+                                ImGui::Text("%s", d->thread_name->c_str());
+                            }
+
+                            if (ImGui::TableSetColumnIndex(4)) {
                                 char str[512] = { 0 };
                                 const char* src = d->content.c_str();
                                 size_t k = 0;
@@ -424,17 +428,6 @@ public:
         }
     }
 private:
-    //inline void nextPage() {
-    //    if ((pageCount + 1) * PAGE_SIZE < db.logs.size()) {
-    //        pageCount = pageCount + 1;
-    //    }
-    //}
-
-    //inline void prevPage() {
-    //    if (pageCount - 1 >= 0) {
-    //        pageCount = pageCount - 1;
-    //    }
-    //}
 
     bool canMoveFileLeftToRight(size_t from_i, std::vector<std::string> const* from, std::vector<std::string>* const to) {
         std::string const* target = &(from->at(from_i));
@@ -446,14 +439,6 @@ private:
         return true;
     }
 
-    //int findPageNo(long id) {
-    //    for (int i = 0; i < db.logs.size(); i++) {
-    //        if (db.logs[i].id == id) {
-    //            return i / PAGE_SIZE;
-    //        }
-    //    }
-    //    return 0;
-    //}
 
     static void writerThread(LogParser::LoadFileStats& data, LogParser::LogStats& new_db, std::vector<std::string> paths) {
         new_db = LogParser::load_files_new(paths, &data);
