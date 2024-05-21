@@ -384,8 +384,12 @@ public:
 
         if (ImGui::Button("Load Logs")) {
             std::vector<std::string> paths;
+            std::string dir = std::string(dir_str);
+            if (dir.back() != '\\' && dir.back() != '/') {
+                dir = dir + "/";
+            }
             for (int i = 0; i < right_files.size(); i++) {
-                std::string p = std::string(dir_str) + right_files[i];
+                std::string p = dir + right_files[i];
                 paths.push_back(p);
             }
 
