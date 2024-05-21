@@ -47,6 +47,8 @@ public:
 
     void RenderUI()
     {
+        ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
+
         if (original_db.logs.size() != new_db.logs.size()) {
             original_db = new_db;
             db = new_db;
