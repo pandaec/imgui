@@ -2,7 +2,7 @@
 
 namespace LogParser {
 
-    const boost::regex pat(R"(^\[([A-Z]{3}) ([A-Za-z0-9\s_\-!@#$%^&*()_+|<?.:=\[\]/,]+?),(\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\.\d{3})\]:(.*)$)");
+    const boost::regex pat(R"(^\[([A-Z]{3}) ([A-Za-z0-9\s_\-!@#$%^&*()_+|<?.:=\[\]/,]+?),(\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\.\d+)\]:(.*)$)");
 
     const LogStats load_logs_new() {
         std::vector<std::string> paths;
