@@ -39,17 +39,10 @@ public:
     Application() {}
 
     void Init() {
-        std::vector<std::string> paths;
-        for (int i = 55; i < 57; i++) {
-            char p[1024];
-            sprintf(p, "D:/Projects/log-parser/WV-ST-20240308/WV-ST-20240308-%04d.log", i);
-            std::string path = std::string(p);
-            paths.push_back(path);
-        }
-
+#ifdef _DEBUG
+        loadDefaultLogs();
+#endif
         resetLogWindow();
-        std::thread writer(&writerThread, std::ref(load_stats), std::ref(new_db), paths);
-        writer.detach();
     }
 
     void RenderUI()
@@ -463,6 +456,20 @@ private:
         scroll_to_id = -1;
         scrolled = true;
     }
+
+#ifdef _DEBUG
+    void loadDefaultLogs() {
+        std::vector<std::string> paths;
+        for (int i = 55; i < 57; i++) {
+            char p[1024];
+            sprintf(p, "D:/Projects/log-parser/WV-ST-20240308/WV-ST-20240308-%04d.log", i);
+            std::string path = std::string(p);
+            paths.push_back(path);
+        }
+        std::thread writer(&writerThread, std::ref(load_stats), std::ref(new_db), paths);
+        writer.detach();
+    }
+#endif
 
     static void writerThread(LogParser::LoadFileStats& data, LogParser::LogStats& new_db, std::vector<std::string> paths) {
         new_db = LogParser::load_files_new(paths, &data);
