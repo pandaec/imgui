@@ -26,6 +26,8 @@ private:
     bool show_import_window = false;
     long scroll_to_id = -1;
     bool scrolled = true;
+    float item_height = -1;
+    float clipper_display_item_size = -1;
 
     // File Loading related
     LogParser::LoadFileStats load_stats;
@@ -45,6 +47,7 @@ public:
             paths.push_back(path);
         }
 
+        resetLogWindow();
         std::thread writer(&writerThread, std::ref(load_stats), std::ref(new_db), paths);
         writer.detach();
     }
@@ -99,8 +102,11 @@ public:
         ImGui::Begin("Log Viewer", &show_log_window);
 
         static char filter_str[1024] = "";
-        if (ImGui::InputTextWithHint("Filter", "Enter text here", filter_str, IM_ARRAYSIZE(filter_str), ImGuiInputTextFlags_EnterReturnsTrue)) {
+        bool scroll_to_top = false;
+        if (ImGui::InputTextWithHint("Filter", "Filter", filter_str, IM_ARRAYSIZE(filter_str), ImGuiInputTextFlags_EnterReturnsTrue)) {
             db.logs.clear();
+            resetFindWindow();
+            scroll_to_top = true;
             for (const LogParser::LogDetailNew& info : original_db.logs) {
                 if (strstr(info.prority.c_str(), filter_str)
                     || strstr((*info.thread_name).c_str(), filter_str)
@@ -120,27 +126,31 @@ public:
 
         ImGui::BeginChild("##cliptest", ImVec2(0, 0));
 
-        static float item_height = -1;
-        static float clipper_display_item_size = -1;
-        if (item_height > 0 && clipper_display_item_size > 0 && !scrolled) {
-            scrolled = true;
-
-            int target_row;
-            for (target_row = 0; target_row < db.logs.size(); target_row++) {
-                if (db.logs[target_row].id == scroll_to_id) {
-                    break;
-                }
-            }
-
-            if (target_row - (clipper_display_item_size / 2) < 0) {
-                target_row = 0;
-            }
-
-            float scroll_y = (target_row - (clipper_display_item_size / 2)) * item_height;
-
-            ImGui::SetScrollY(scroll_y);
+        if (scroll_to_top) {
+            ImGui::SetScrollY(0);
         }
+        else {
+            if (item_height > 0 && clipper_display_item_size > 0 && !scrolled) {
+                scrolled = true;
 
+                int target_row;
+                for (target_row = 0; target_row < db.logs.size(); target_row++) {
+                    if (db.logs[target_row].id == scroll_to_id) {
+                        break;
+                    }
+                }
+
+                float scroll_y;
+                if (target_row - (clipper_display_item_size / 2) < 0) {
+                    scroll_y = 0;
+                }
+                else {
+                    scroll_y = (target_row - (clipper_display_item_size / 2)) * item_height;
+                }
+
+                ImGui::SetScrollY(scroll_y);
+            }
+        }
 
         if (ImGui::BeginTable("LogTable", 5, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable))
         {
@@ -164,7 +174,7 @@ public:
                         ImGui::Text("%ld", d->id);
                     }
                     if (ImGui::TableSetColumnIndex(1)) {
-                        const bool item_is_selected = selection.contains(d->id);
+                        const bool item_is_selected = selection.contains(d->id) && scroll_to_id != d->id;
                         char label[128];
                         snprintf(label, sizeof(label), "%s##%ld", d->dt.c_str(), d->id);
                         if (ImGui::Selectable(label, item_is_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap, ImVec2(0, 0))) {
@@ -292,6 +302,8 @@ public:
                                 if (ImGui::Selectable(label, false, ImGuiSelectableFlags_SpanAllColumns, ImVec2(0, 0))) {
                                     scroll_to_id = d->id;
                                     scrolled = false;
+                                    selection.clear();
+                                    selection.push_back(d->id);
                                 }
                             }
 
@@ -384,6 +396,7 @@ public:
                 paths.push_back(p);
             }
 
+            resetLogWindow();
             std::thread writer(&writerThread, std::ref(load_stats), std::ref(new_db), paths);
             writer.detach();
         }
@@ -439,6 +452,17 @@ private:
         return true;
     }
 
+    void resetLogWindow() {
+        db = {};
+        original_db = {};
+        resetFindWindow();
+    }
+
+    void resetFindWindow() {
+        find_info = {};
+        scroll_to_id = -1;
+        scrolled = true;
+    }
 
     static void writerThread(LogParser::LoadFileStats& data, LogParser::LogStats& new_db, std::vector<std::string> paths) {
         new_db = LogParser::load_files_new(paths, &data);
