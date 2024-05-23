@@ -103,10 +103,10 @@ public:
             resetFindWindow();
             scroll_to_top = true;
             for (const LogParser::LogDetailNew& info : original_db.logs) {
-                if (stristr(info.prority.c_str(), filter_str)
-                    || stristr((*info.thread_name).c_str(), filter_str)
-                    || stristr(info.dt.c_str(), filter_str)
-                    || stristr(info.content.c_str(), filter_str)) {
+                if (strstr(info.prority.c_str(), filter_str)
+                    || strstr((*info.thread_name).c_str(), filter_str)
+                    || strstr(info.dt.c_str(), filter_str)
+                    || strstr(info.content.c_str(), filter_str)) {
                     db.logs.push_back(info);
                 }
             }
@@ -253,15 +253,15 @@ public:
                     find_info.log_stats.logs.clear();
 
                     for (const LogParser::LogDetailNew& info : original_db.logs) {
-                        if (stristr(info.prority.c_str(), filter_str)
-                            || stristr((*info.thread_name).c_str(), filter_str)
-                            || stristr(info.dt.c_str(), filter_str)
-                            || stristr(info.content.c_str(), filter_str)) {
+                        if (strstr(info.prority.c_str(), filter_str)
+                            || strstr((*info.thread_name).c_str(), filter_str)
+                            || strstr(info.dt.c_str(), filter_str)
+                            || strstr(info.content.c_str(), filter_str)) {
 
-                            if (stristr(info.prority.c_str(), find_info.filter_text)
-                                || stristr((*info.thread_name).c_str(), find_info.filter_text)
-                                || stristr(info.dt.c_str(), find_info.filter_text)
-                                || stristr(info.content.c_str(), find_info.filter_text)) {
+                            if (strstr(info.prority.c_str(), find_info.filter_text)
+                                || strstr((*info.thread_name).c_str(), find_info.filter_text)
+                                || strstr(info.dt.c_str(), find_info.filter_text)
+                                || strstr(info.content.c_str(), find_info.filter_text)) {
 
                                 find_info.log_stats.logs.push_back(info);
                             }
