@@ -24,6 +24,9 @@ private:
     bool show_demo_window = false;
     bool show_log_window = true;
     bool show_import_window = false;
+    char filter_str[1024] = "";
+    ImVector<long> selected_logs;
+
     long scroll_to_id = -1;
     bool scrolled = true;
     float item_height = -1;
@@ -96,7 +99,6 @@ public:
     {
         ImGui::Begin("Log Viewer", &show_log_window);
 
-        static char filter_str[1024] = "";
         bool scroll_to_top = false;
         if (ImGui::InputTextWithHint("Filter", "Filter", filter_str, IM_ARRAYSIZE(filter_str), ImGuiInputTextFlags_EnterReturnsTrue)) {
             db.logs.clear();
@@ -112,9 +114,6 @@ public:
             }
         }
 
-        ImGui::Spacing();
-
-        static ImVector<long> selection;
         ImGui::Spacing();
 
         ImGui::BeginChild("ChildL", ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y * 0.7f), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar);
@@ -169,12 +168,12 @@ public:
                         ImGui::Text("%ld", d->id);
                     }
                     if (ImGui::TableSetColumnIndex(1)) {
-                        const bool item_is_selected = selection.contains(d->id) && scroll_to_id != d->id;
+                        const bool item_is_selected = selected_logs.contains(d->id) && scroll_to_id != d->id;
                         char label[128];
                         snprintf(label, sizeof(label), "%s##%ld", d->dt.c_str(), d->id);
                         if (ImGui::Selectable(label, item_is_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap, ImVec2(0, 0))) {
-                            selection.clear();
-                            selection.push_back(d->id);
+                            selected_logs.clear();
+                            selected_logs.push_back(d->id);
                         }
                     }
                     if (ImGui::TableSetColumnIndex(2)) {
@@ -215,8 +214,8 @@ public:
         ImGui::Spacing();
 
         static char text[1024 * 1024] = {};
-        if (selection.size() > 0) {
-            int id = selection[0];
+        if (selected_logs.size() > 0) {
+            int id = selected_logs[0];
             for (const LogParser::LogDetailNew& info : original_db.logs) {
                 if (info.id == id) {
                     std::string s = std::string(*info.file_name);
@@ -233,7 +232,7 @@ public:
 
         if (ImGui::BeginTabBar("##Tabs", ImGuiTabBarFlags_None)) {
             if (ImGui::BeginTabItem("Info")) {
-                if (selection.size() > 0) {
+                if (selected_logs.size() > 0) {
                     ImGui::TextWrapped(text);
                 }
                 else {
@@ -297,8 +296,8 @@ public:
                                 if (ImGui::Selectable(label, false, ImGuiSelectableFlags_SpanAllColumns, ImVec2(0, 0))) {
                                     scroll_to_id = d->id;
                                     scrolled = false;
-                                    selection.clear();
-                                    selection.push_back(d->id);
+                                    selected_logs.clear();
+                                    selected_logs.push_back(d->id);
                                 }
                             }
 
