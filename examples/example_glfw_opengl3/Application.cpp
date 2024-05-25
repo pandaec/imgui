@@ -9,8 +9,17 @@
 
 namespace fs = std::filesystem;
 
+
+struct Filter {
+    char str[1024] = { 0 };
+    char str_raw[1048] = { 0 };
+    bool is_case_sensitive = false;
+    bool is_regex_error = false;
+    boost::regex pattern;
+};
+
 struct FindInfo {
-    char filter_text[1024] = { 0 };
+    Filter filter;
     LogParser::LogStats log_stats;
 };
 
@@ -24,7 +33,8 @@ private:
     bool show_demo_window = false;
     bool show_log_window = true;
     bool show_import_window = false;
-    char filter_str[1024] = "";
+    Filter filter;
+    Filter detail_filter;
     ImVector<long> selected_logs;
 
     long scroll_to_id = -1;
@@ -100,21 +110,44 @@ public:
         ImGui::Begin("Log Viewer", &show_log_window);
 
         bool scroll_to_top = false;
-        if (ImGui::InputTextWithHint("Filter", "Filter", filter_str, IM_ARRAYSIZE(filter_str), ImGuiInputTextFlags_EnterReturnsTrue)) {
-            db.logs.clear();
-            resetFindWindow();
-            scroll_to_top = true;
-            for (const LogParser::LogDetailNew& info : original_db.logs) {
-                if (strstr(info.prority.c_str(), filter_str)
-                    || strstr((*info.thread_name).c_str(), filter_str)
-                    || strstr(info.dt.c_str(), filter_str)
-                    || strstr(info.content.c_str(), filter_str)) {
-                    db.logs.push_back(info);
+        if (ImGui::InputTextWithHint("Filter", "Filter", filter.str, IM_ARRAYSIZE(filter.str), ImGuiInputTextFlags_EnterReturnsTrue)) {
+            try {
+                sprintf_s(filter.str_raw, sizeof(filter.str_raw), "^.*%s.*$", filter.str);
+                boost::regex_constants::syntax_option_type flag = boost::regex_constants::perl;
+                if (!filter.is_case_sensitive) {
+                    flag |= boost::regex_constants::icase;
                 }
+                filter.pattern = boost::regex(filter.str_raw, flag);
+
+                filter.is_regex_error = false;
+                db.logs.clear();
+                resetFindWindow();
+                scroll_to_top = true;
+
+                boost::smatch matches;
+                for (const LogParser::LogDetailNew& info : original_db.logs) {
+                    if (isLineMatch(info, filter.pattern, matches)) {
+                        db.logs.push_back(info);
+                    }
+                }
+            }
+            catch (const boost::regex_error& e) {
+                // TODO show error handling in lower panel
+                std::cerr << "Regex error: " << e.what() << '\n';
+                std::cerr << "Error code: " << e.code() << '\n';
+                filter.is_regex_error = true;
             }
         }
 
+        ImGui::SameLine();
+        ImGui::Checkbox("Case Sensitive", &filter.is_case_sensitive);
+
         ImGui::Spacing();
+
+        if (filter.is_regex_error) {
+            ImGui::TextColored(ImVec4(0.8f, 0.0f, 0.0f, 1.0f), "Syntax Error");
+            ImGui::Spacing();
+        }
 
         ImGui::BeginChild("ChildL", ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y * 0.7f), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar);
 
@@ -248,27 +281,46 @@ public:
             }
 
             if (ImGui::BeginTabItem("Find")) {
-                if (ImGui::InputTextWithHint("Filter", "Filter", find_info.filter_text, IM_ARRAYSIZE(find_info.filter_text), ImGuiInputTextFlags_EnterReturnsTrue)) {
-                    find_info.log_stats.logs.clear();
+                if (ImGui::InputTextWithHint("Filter", "Filter", find_info.filter.str, IM_ARRAYSIZE(find_info.filter.str), ImGuiInputTextFlags_EnterReturnsTrue)) {
+                    try {
+                        sprintf_s(find_info.filter.str_raw, sizeof(find_info.filter.str_raw), "^.*%s.*$", find_info.filter.str);
+                        boost::regex_constants::syntax_option_type flag = boost::regex_constants::perl;
+                        if (!find_info.filter.is_case_sensitive) {
+                            flag |= boost::regex_constants::icase;
+                        }
+                        find_info.filter.pattern = boost::regex(find_info.filter.str_raw, flag);
 
-                    for (const LogParser::LogDetailNew& info : original_db.logs) {
-                        if (strstr(info.prority.c_str(), filter_str)
-                            || strstr((*info.thread_name).c_str(), filter_str)
-                            || strstr(info.dt.c_str(), filter_str)
-                            || strstr(info.content.c_str(), filter_str)) {
+                        find_info.filter.is_regex_error = false;
+                        ImGui::SetScrollY(0);
+                        find_info.log_stats.logs.clear();
 
-                            if (strstr(info.prority.c_str(), find_info.filter_text)
-                                || strstr((*info.thread_name).c_str(), find_info.filter_text)
-                                || strstr(info.dt.c_str(), find_info.filter_text)
-                                || strstr(info.content.c_str(), find_info.filter_text)) {
-
-                                find_info.log_stats.logs.push_back(info);
+                        boost::smatch matches;
+                        for (const LogParser::LogDetailNew& info : original_db.logs) {
+                            if (isLineMatch(info, filter.pattern, matches)) {
+                                if (isLineMatch(info, find_info.filter.pattern, matches)) {
+                                    find_info.log_stats.logs.push_back(info);
+                                }
                             }
                         }
                     }
+                    catch (const boost::regex_error& e) {
+                        // TODO show error handling in lower panel
+                        std::cerr << "Regex error: " << e.what() << '\n';
+                        std::cerr << "Error code: " << e.code() << '\n';
+                        find_info.filter.is_regex_error = true;
+                    }
+
                 }
 
+                ImGui::SameLine();
+                ImGui::Checkbox("Case Sensitive", &find_info.filter.is_case_sensitive);
+
                 ImGui::Spacing();
+
+                if (find_info.filter.is_regex_error) {
+                    ImGui::TextColored(ImVec4(0.8f, 0.0f, 0.0f, 1.0f), "Syntax Error");
+                    ImGui::Spacing();
+                }
 
                 ImGui::BeginChild("ChildFindTab", ImGui::GetContentRegionAvail(), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar);
 
@@ -478,6 +530,17 @@ private:
 
     static void writerThread(LogParser::LoadFileStats& data, LogParser::LogStats& new_db, std::vector<std::string> paths) {
         new_db = LogParser::load_files_new(paths, &data);
+    }
+
+    static bool isLineMatch(const LogParser::LogDetailNew& info, const boost::regex& pattern, boost::smatch& matches) {
+        if (boost::regex_match(info.prority, matches, pattern)
+            || boost::regex_match(*info.thread_name, matches, pattern)
+            || boost::regex_match(info.dt, matches, pattern)
+            || boost::regex_match(info.content, matches, pattern))
+        {
+            return true;
+        }
+        return false;
     }
 
     // Temporary c_str case insensitive equality test

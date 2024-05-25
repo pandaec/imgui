@@ -39,8 +39,8 @@ namespace LogParser {
         }
 
         std::string line;
+        boost::smatch matches;
         while (std::getline(file, line)) {
-            boost::smatch matches;
             if (boost::regex_match(line, matches, pat)) {
                 if (matches.size() == 5) {
                     struct LogDetailNew d = {};
