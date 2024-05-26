@@ -46,7 +46,7 @@ int WinMain(
     HINSTANCE hPrevInstance,
     LPSTR lpCmdLine,
     int nCmdShow
-){
+) {
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
         return 1;
@@ -75,7 +75,7 @@ int WinMain(
 #endif
 
     // Create window with graphics context
-    GLFWwindow* window = glfwCreateWindow(1280, 720, "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(1280, 720, "Log Parser", nullptr, nullptr);
     if (window == nullptr)
         return 1;
     glfwMakeContextCurrent(window);

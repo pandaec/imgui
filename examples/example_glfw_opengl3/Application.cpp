@@ -12,10 +12,9 @@ namespace fs = std::filesystem;
 
 struct Filter {
     char str[1024] = { 0 };
-    char str_raw[1048] = { 0 };
+    std::unordered_map<std::string, boost::regex> pattern_map;
     bool is_case_sensitive = false;
     bool is_regex_error = false;
-    boost::regex pattern;
 };
 
 struct FindInfo {
@@ -111,31 +110,19 @@ public:
 
         bool scroll_to_top = false;
         if (ImGui::InputTextWithHint("Filter", "Filter", filter.str, IM_ARRAYSIZE(filter.str), ImGuiInputTextFlags_EnterReturnsTrue)) {
-            try {
-                sprintf_s(filter.str_raw, sizeof(filter.str_raw), "^.*%s.*$", filter.str);
-                boost::regex_constants::syntax_option_type flag = boost::regex_constants::perl;
-                if (!filter.is_case_sensitive) {
-                    flag |= boost::regex_constants::icase;
-                }
-                filter.pattern = boost::regex(filter.str_raw, flag);
+            parseFilter(&filter);
 
-                filter.is_regex_error = false;
+            if (!filter.is_regex_error) {
                 db.logs.clear();
                 resetFindWindow();
                 scroll_to_top = true;
 
                 boost::smatch matches;
                 for (const LogParser::LogDetailNew& info : original_db.logs) {
-                    if (isLineMatch(info, filter.pattern, matches)) {
+                    if (isLineMatchFilter(info, filter, matches)) {
                         db.logs.push_back(info);
                     }
                 }
-            }
-            catch (const boost::regex_error& e) {
-                // TODO show error handling in lower panel
-                std::cerr << "Regex error: " << e.what() << '\n';
-                std::cerr << "Error code: " << e.code() << '\n';
-                filter.is_regex_error = true;
             }
         }
 
@@ -282,34 +269,21 @@ public:
 
             if (ImGui::BeginTabItem("Find")) {
                 if (ImGui::InputTextWithHint("Filter", "Filter", find_info.filter.str, IM_ARRAYSIZE(find_info.filter.str), ImGuiInputTextFlags_EnterReturnsTrue)) {
-                    try {
-                        sprintf_s(find_info.filter.str_raw, sizeof(find_info.filter.str_raw), "^.*%s.*$", find_info.filter.str);
-                        boost::regex_constants::syntax_option_type flag = boost::regex_constants::perl;
-                        if (!find_info.filter.is_case_sensitive) {
-                            flag |= boost::regex_constants::icase;
-                        }
-                        find_info.filter.pattern = boost::regex(find_info.filter.str_raw, flag);
+                    parseFilter(&find_info.filter);
 
-                        find_info.filter.is_regex_error = false;
+                    if (!find_info.filter.is_regex_error) {
                         ImGui::SetScrollY(0);
                         find_info.log_stats.logs.clear();
 
                         boost::smatch matches;
                         for (const LogParser::LogDetailNew& info : original_db.logs) {
-                            if (isLineMatch(info, filter.pattern, matches)) {
-                                if (isLineMatch(info, find_info.filter.pattern, matches)) {
+                            if (isLineMatchFilter(info, filter, matches)) {
+                                if (isLineMatchFilter(info, find_info.filter, matches)) {
                                     find_info.log_stats.logs.push_back(info);
                                 }
                             }
                         }
                     }
-                    catch (const boost::regex_error& e) {
-                        // TODO show error handling in lower panel
-                        std::cerr << "Regex error: " << e.what() << '\n';
-                        std::cerr << "Error code: " << e.code() << '\n';
-                        find_info.filter.is_regex_error = true;
-                    }
-
                 }
 
                 ImGui::SameLine();
@@ -476,7 +450,7 @@ public:
         ImVec2 center = ImGui::GetMainViewport()->GetCenter();
         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
-        if (ImGui::BeginPopupModal("Importing...", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+        if (ImGui::BeginPopupModal("Importing...", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
         {
             char s[1024];
             sprintf(s, "Files Loaded: %d/%d", load_stats.cur_file_count, load_stats.total_file_count);
@@ -531,15 +505,108 @@ private:
         new_db = LogParser::load_files_new(paths, &data);
     }
 
-    static bool isLineMatch(const LogParser::LogDetailNew& info, const boost::regex& pattern, boost::smatch& matches) {
-        if (boost::regex_match(info.prority, matches, pattern)
-            || boost::regex_match(*info.thread_name, matches, pattern)
-            || boost::regex_match(info.dt, matches, pattern)
-            || boost::regex_match(info.content, matches, pattern))
-        {
+    static void resetFilter(Filter& filter) {
+        //std::fill(std::begin(filter.str), std::end(filter.str), 0);
+        //std::fill(std::begin(filter.str_raw), std::end(filter.str_raw), 0);
+        //filter.is_case_sensitive = false;
+        filter.pattern_map.clear();
+        filter.is_regex_error = false;
+    }
+
+    static void parseFilter(Filter* filter) {
+        resetFilter(*filter);
+        std::string sfilter = std::string(filter->str);
+
+        boost::regex_constants::syntax_option_type flag = boost::regex_constants::perl;
+        if (!filter->is_case_sensitive) {
+            flag |= boost::regex_constants::icase;
+        }
+
+        try {
+            size_t col_name_start = 0, col_name_end = 0, cond_start = 0, cond_end = 0;
+            for (size_t i = 0; i < sfilter.size(); i++) {
+                char c = sfilter[i];
+                if (col_name_end < 1) {
+                    for (; i < sfilter.size() && sfilter[i] == ' '; i++);
+                    col_name_start = i;
+                    for (; i + 1 < sfilter.size() && sfilter[i + 1] != ' ' && sfilter[i + 1] != '='; i++);
+                    col_name_end = i + 1;
+                }
+                else if (cond_start < 1) {
+                    if (c == '"') {
+                        i = i + 1;
+                        cond_start = i;
+                        for (; i < sfilter.size() && sfilter[i] != '"'; i++);
+                        cond_end = i;
+                        std::string k = sfilter.substr(col_name_start, col_name_end - col_name_start);
+                        std::string v = "^.*" + sfilter.substr(cond_start, cond_end - cond_start) + ".*$";
+                        auto pattern = boost::regex(v, flag);
+                        filter->pattern_map[k] = pattern;
+                    }
+                }
+                else if (cond_end > 0) {
+                    if (c == 'A' || c == 'a') {
+                        if (i + 2 < sfilter.size()
+                            && (sfilter[i + 1] == 'N' || sfilter[i + 1] == 'n')
+                            && (sfilter[i + 2] == 'D' || sfilter[i + 2] == 'd')) {
+                            i = i + 3;
+                            for (; i + 1 < sfilter.size() && sfilter[i + 1] == ' '; i++);
+                            col_name_start = i + 1;
+                            col_name_end = 0, cond_start = 0, cond_end = 0;
+                        }
+                    }
+                }
+                for (; i + 1 < sfilter.size() && sfilter[i + 1] == ' '; i++);
+            }
+
+            if (filter->pattern_map.size() == 0) {
+                auto pattern = boost::regex("^.*" + sfilter + ".*$", flag);
+                filter->pattern_map["*"] = pattern;
+            }
+        }
+        catch (const boost::regex_error& e) {
+            std::cerr << "Regex error: " << e.what() << '\n';
+            std::cerr << "Error code: " << e.code() << '\n';
+            filter->is_regex_error = true;
+        }
+
+        filter->is_regex_error = false;
+    }
+
+    static bool isLineMatchFilter(const LogParser::LogDetailNew& info, const Filter& filter, boost::smatch& matches) {
+        auto m = filter.pattern_map;
+        boost::regex* regex_default = nullptr;
+        auto default_it = m.find("*");
+        if (default_it != m.end()) {
+            regex_default = &default_it->second;
+        }
+
+        std::vector <std::pair<std::string, const std::string&>> keys = {
+            {"C1", info.dt},
+            {"C2", info.prority},
+            {"C3", *info.thread_name},
+            {"C4", info.content}
+        };
+
+        if (regex_default == nullptr) {
+            for (const auto& kv : keys) {
+                auto it = m.find(kv.first);
+                if (it != m.end()) {
+                    if (!boost::regex_match(kv.second, matches, it->second)) {
+                        return false;
+                    }
+                }
+            }
             return true;
         }
-        return false;
+        else {
+            for (const auto& kv : keys) {
+                if (boost::regex_match(kv.second, matches, *regex_default)) {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 
     // Temporary c_str case insensitive equality test
