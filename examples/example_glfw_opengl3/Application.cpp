@@ -509,7 +509,6 @@ private:
     }
 
     void resetFindWindow() {
-        find_info = {};
         scroll_to_id = -1;
         scrolled = true;
     }
